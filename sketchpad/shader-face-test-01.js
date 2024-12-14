@@ -69,7 +69,7 @@ const sketch = ({ gl, width, height }) => {
 			uResolution: () => [width, height],
 			uTime: ({ time }) => time, // Initialize with a default value
 			uTexture: () => textureA,
-			uGridSize: [params.numberOfCols, params.numberOfRows], // Default rows and columns
+			uGridSize: () => [params.numberOfCols, params.numberOfRows], // Default rows and columns
 		},
 	})
 

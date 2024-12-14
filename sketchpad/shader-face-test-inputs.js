@@ -5,7 +5,7 @@ const Tweakpane = require('tweakpane')
 const glsl = require('glslify')
 
 // Input image texture URL
-const textureURL = 'images/test-input-02.png'
+const textureURL = 'images/test-input.png'
 
 let textureA
 let manager
@@ -18,6 +18,9 @@ const frag = glsl`
   uniform sampler2D uTexture;
   uniform float uTime;
   uniform vec2 uGridSize;
+	uniform vec2 uCenter;  // Center point for distance calculation
+	uniform float uRadius; // Radius for smoothstep calculation
+	uniform float uDisplacement;
 
   void main() {
     vec2 uv = gl_FragCoord.xy / uResolution.xy;
@@ -25,17 +28,19 @@ const frag = glsl`
     // Flip the UV vertically to correct upside-down rendering
     uv.y = 1.0 - uv.y;
 
-    // Compute distance from the center and strength
-    float dist = distance(vec2(0.5, 0.5), uv);
-    float strength = smoothstep(0.6, 0.0, dist);
+		// Compute distance from the configurable center
+    float dist = distance(uCenter, uv);
 
+		// Compute strength based on configurable radius
+    float strength = smoothstep(uRadius, 0.0, dist);
+		
     // Set up grid size
     vec2 gridSize = uGridSize; // Number of rows and columns
     vec2 gridUV = fract(uv * gridSize); // Local UV within each cell
     vec2 gridIndex = floor(uv * gridSize); // Discrete cell index
 
     // Add displacement based on grid index and strength
-    float displacement = 0.05 * sin(uTime + gridIndex.x * strength * 3.0 + gridIndex.y * strength * 2.0);
+    float displacement = uDisplacement * sin(uTime + gridIndex.x * strength * 3.0 + gridIndex.y * strength * 2.0);
     vec2 displacedUV = uv + displacement;
 
     // Adjust UVs to handle aspect ratio mismatches
@@ -60,6 +65,10 @@ const settings = {
 const params = {
 	numberOfRows: 10,
 	numberOfCols: 10,
+	centerX: 0.5,
+	centerY: 0.5,
+	radius: 0.6,
+	displacement: 0.05,
 }
 
 const sketch = ({ gl, width, height }) => {
@@ -71,6 +80,9 @@ const sketch = ({ gl, width, height }) => {
 			uTime: ({ time }) => time, // Initialize with a default value
 			uTexture: () => textureA,
 			uGridSize: () => [params.numberOfCols, params.numberOfRows], // Default rows and columns
+			uCenter: () => [params.centerX, params.centerY],
+			uRadius: () => params.radius,
+			uDisplacement: () => params.displacement,
 		},
 	})
 
@@ -108,6 +120,30 @@ const createPane = () => {
 		min: 1,
 		max: 50,
 		step: 1,
+	})
+
+	pane.addInput(params, 'centerX', {
+		min: 0.1,
+		max: 1.0,
+		step: 0.1,
+	})
+
+	pane.addInput(params, 'centerY', {
+		min: 0.1,
+		max: 1.0,
+		step: 0.1,
+	})
+
+	pane.addInput(params, 'radius', {
+		min: 0.1,
+		max: 1.0,
+		step: 0.1,
+	})
+
+	pane.addInput(params, 'displacement', {
+		min: 0.01,
+		max: 1.0,
+		step: 0.01,
 	})
 }
 
