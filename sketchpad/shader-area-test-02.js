@@ -3,6 +3,7 @@ const createShader = require('canvas-sketch-util/shader')
 const glsl = require('glslify')
 const math = require('canvas-sketch-util/math')
 const loadAsset = require('load-asset')
+const Tweakpane = require('tweakpane')
 
 const settings = {
 	context: 'webgl',
@@ -10,7 +11,10 @@ const settings = {
 	// dimensions: [1080, 1080],
 }
 
+// Kinda pond like effect
 const frag = glsl(`
+	#pragma glslify: fbm = require('./shader-utils.glsl').fbm
+
   precision mediump float;
 
   varying vec2 vUv;
@@ -18,17 +22,16 @@ const frag = glsl(`
   uniform sampler2D uTexture;
   uniform vec2 uOffset;
   uniform float uTime;
+	uniform float uDistortionVar;
 
   void main() {
     vec2 uv = vUv;
     uv.y = 1.0 - uv.y;
 
-    vec2 distortion = vec2(cos(uv.y * uOffset.x + uTime * 0.1) * uOffset.y, sin(uv.y * uOffset.x + uTime) * uOffset.y);
+    vec2 distortion = vec2(cos(uv.x * uOffset.x + uTime * uDistortionVar) * uOffset.y, sin(uv.y * uOffset.x + uTime) * uOffset.y);
+		float fbmNum = fbm(distortion) * 10.5;
 
-    float slides = uv.y * uOffset.x + uTime * 0.1;
-    slides = fract(slides);
-
-    vec4 tex = texture2D(uTexture, uv + distortion);
+    vec4 tex = texture2D(uTexture, uv + distortion*fbmNum);
 
     gl_FragColor = tex;
   }
@@ -37,8 +40,12 @@ const frag = glsl(`
 let offsetX
 let offsetY
 
+const params = {
+	distortionVar: 0.1,
+}
+
 const sketch = async ({ gl, width, height }) => {
-	const image = await loadAsset('images/test-input-02.png')
+	const image = await loadAsset('images/test-input.png')
 
 	const mouse = [0, 0]
 
@@ -78,6 +85,7 @@ const sketch = async ({ gl, width, height }) => {
 			// Use an array here to ensure it picks up the new values each render
 			mouse: () => mouse,
 			uOffset: () => [offsetX, offsetY],
+			uDistortionVar: () => params.distortionVar,
 		},
 	})
 
@@ -94,4 +102,15 @@ const sketch = async ({ gl, width, height }) => {
 	}
 }
 
+const createPane = () => {
+	const pane = new Tweakpane.Pane()
+
+	pane.addInput(params, 'distortionVar', {
+		min: 0.05,
+		max: 2.0,
+		step: 0.01,
+	})
+}
+
+createPane()
 canvasSketch(sketch, settings)

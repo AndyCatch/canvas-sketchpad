@@ -13,7 +13,7 @@ const params = {
 	brightness: 0.5,
 	contrast: 0.5,
 	colSpeed: 1.0,
-	red: 0.0,
+	red: 0.2,
 	green: 0.33,
 	blue: 0.67,
 }
@@ -22,35 +22,40 @@ let manager
 
 // Your glsl code
 const frag = glsl(`
-  precision highp float;
+	#pragma glslify: fbm = require('./shader-utils.glsl').fbm
+	// #pragma glslify: dither = require(glsl-dither)
+	#pragma glslify: dither = require(glsl-dither/8x8) 
+// #pragma glslify: dither = require(glsl-dither/4x4) 
+// #pragma glslify: dither = require(glsl-dither/2x2) 
 
-  uniform vec2 uResolution;
-  uniform float uTime;
-  uniform float uBrightness;
-  uniform float uContrast;
-  uniform float uColSpeed;
-  uniform float uRed;
-  uniform float uGreen;
-  uniform float uBlue;
-  varying vec2 vUv;
+precision highp float;
 
-  vec3 pal( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d )
-  {
-    return a + b*cos( 6.28318*(c*t+d) );
-  }
+uniform vec2 uResolution;
+uniform float uTime;
+uniform float uBrightness;
+uniform float uContrast;
+uniform float uColSpeed;
+uniform float uRed;
+uniform float uGreen;
+uniform float uBlue;
+varying vec2 vUv;
 
-  void main () {
+vec3 pal(in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d) {
+    return a + b * cos(6.28318 * (c * t + d));
+}
+
+void main() {
     vec2 p = gl_FragCoord.xy / uResolution.xy;
+    p += sin(uTime * 0.8 * cos(uTime*0.05)) * fbm(p * 2.0 + vec2(uTime * 1.25));
 
-    // animate
-    p.x += 0.01*uTime;
-    
-    vec3 color = pal( p.x, vec3(uBrightness,uBrightness,uBrightness),vec3(uContrast,uContrast,uContrast),vec3(uColSpeed,uColSpeed,uColSpeed),vec3(uRed,uGreen,uBlue) );
-    // vec3 color = pal( p.x, vec3(uBrightness,uBrightness,uBrightness),vec3(uContrast,uContrast,uContrast),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) );
+    vec3 color = pal(p.x + 0.9 * uTime, vec3(uBrightness), vec3(uContrast), vec3(uColSpeed*0.1,uColSpeed*0.2,uColSpeed*0.3), vec3(uRed, uGreen, uBlue));
 
-    // vec3 color = 0.5 + 0.5 * cos(time + vUv.xyx + vec3(0.0, 2.0, 4.0));
-    gl_FragColor = vec4(color, 1.0);
-  }
+		vec4 superColor = vec4(color, 1.0);
+		
+		gl_FragColor = dither(gl_FragCoord.xy, superColor);
+
+    // gl_FragColor = vec4(color, 1.0);
+}
 `)
 
 // Your sketch, which simply returns the shader
@@ -102,14 +107,14 @@ const createPane = () => {
 	})
 
 	pane.addInput(params, 'colSpeed', {
-		min: 0.5,
+		min: 0.1,
 		max: 20.0,
 		step: 0.1,
 	})
 
 	pane.addInput(params, 'red', {
 		min: 0.0,
-		max: 1.0,
+		max: 2.0,
 		step: 0.01,
 	})
 
@@ -127,9 +132,6 @@ const createPane = () => {
 }
 
 const start = async () => {
-	textureA = await loadImage(textureURL)
-	console.log(textureA)
-
 	manager = await canvasSketch(sketch, settings)
 }
 

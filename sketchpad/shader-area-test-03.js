@@ -11,13 +11,19 @@ const settings = {
 	// dimensions: [1080, 1080],
 }
 
+// TV glitch-like
 const frag = glsl(`
-  precision mediump float;
+	#pragma glslify: fbm = require('./shader-utils.glsl').fbm
+	// #pragma glslify: dither = require(glsl-dither)
+	#pragma glslify: dither = require(glsl-dither/8x8) 
+
+	precision mediump float;
 
   varying vec2 vUv;
 
   uniform sampler2D uTexture;
   uniform vec2 uOffset;
+	uniform float uTimeOffset;
   uniform float uTime;
 
   void main() {
@@ -26,12 +32,13 @@ const frag = glsl(`
 
     vec2 distortion = vec2(cos(uv.y * uOffset.x + uTime * 0.1) * uOffset.y, sin(uv.y * uOffset.x + uTime) * uOffset.y);
 
-    float slides = uv.y * uOffset.x + uTime * 0.4;
+    float slides = uv.x * uOffset.x + uTime * uTimeOffset;
     slides = fract(slides);
 
-		vec4 tex = texture2D(uTexture, uv + vec2(slides*0.5,slides) * uOffset.y);
-   
-    gl_FragColor = tex;
+		vec4 tex = texture2D(uTexture, uv + fbm(vec2(slides*0.5,slides)) * uOffset.y);
+
+		gl_FragColor = dither(gl_FragCoord.xy, tex);
+    // gl_FragColor = tex;
   }
 `)
 
@@ -40,15 +47,17 @@ let offsetY
 
 const params = {
 	multiplier: 100,
+	rangeEnd: 100,
+	timeOffset: 0.4,
 }
 
 const sketch = async ({ gl, width, height }) => {
 	const image = await loadAsset('images/test-input-02.png')
-
 	const mouse = [0, 0]
 
 	// Initial offset
-	offsetX = math.mapRange(mouse[0], 0, width, 0, 100) * params.multiplier
+	offsetX =
+		math.mapRange(mouse[0], 0, width, 0, params.rangeEnd) * params.multiplier
 	offsetY = math.mapRange(mouse[1], 0, height, 0.001, 0.05) * params.multiplier
 
 	// Create a mouse listener
@@ -56,10 +65,8 @@ const sketch = async ({ gl, width, height }) => {
 		mouse[0] = ev.clientX / window.innerWidth
 		mouse[1] = (window.innerHeight - ev.clientY - 1) / window.innerHeight
 
-		// mouse[0] = ev.clientX / window.innerWidth
-		// mouse[1] = ev.clientY / window.innerHeight
-
-		offsetX = math.mapRange(mouse[0], 0, width, 0, 100) * params.multiplier
+		offsetX =
+			math.mapRange(mouse[0], 0, width, 0, params.rangeEnd) * params.multiplier
 		offsetY =
 			math.mapRange(mouse[1], 0, window.innerHeight, 0.001, 0.05) *
 			params.multiplier
@@ -85,6 +92,7 @@ const sketch = async ({ gl, width, height }) => {
 			// Use an array here to ensure it picks up the new values each render
 			mouse: () => mouse,
 			uOffset: () => [offsetX, offsetY],
+			uTimeOffset: () => params.timeOffset,
 		},
 	})
 
@@ -108,6 +116,18 @@ const createPane = () => {
 		min: 50,
 		max: 1000,
 		step: 1,
+	})
+
+	pane.addInput(params, 'rangeEnd', {
+		min: -50,
+		max: 1000,
+		step: 1,
+	})
+
+	pane.addInput(params, 'timeOffset', {
+		min: 0.1,
+		max: 2.0,
+		step: 0.01,
 	})
 }
 
